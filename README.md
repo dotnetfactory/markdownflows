@@ -16,7 +16,7 @@
 - **🤖 AI-Powered Generation** - Describe diagrams in natural language and let AI create them
 - **💾 Local-First Storage** - All diagrams stored securely on your device
 - **🔒 Secure API Keys** - OpenAI keys encrypted using your system's secure storage
-- **📤 SVG Export** - Export diagrams as high-quality SVG files
+- **📤 SVG & PNG Export** - Export diagrams as high-quality SVG or PNG files
 - **🎨 Clean Print-Ready Theme** - Neutral colors optimized for both screen and print
 
 ## Supported Diagram Types

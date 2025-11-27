@@ -435,6 +435,122 @@ export function DiagramsPage() {
     toast.success('SVG exported');
   };
 
+  const handleExportPng = async () => {
+    if (!renderedSvg) {
+      toast.error('No diagram to export');
+      return;
+    }
+
+    try {
+      // Parse SVG from the rendered output
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(renderedSvg, 'image/svg+xml');
+      const svgElement = svgDoc.querySelector('svg');
+      
+      if (!svgElement) {
+        toast.error('Failed to parse SVG');
+        return;
+      }
+
+      // Ensure SVG has xmlns attribute
+      if (!svgElement.getAttribute('xmlns')) {
+        svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
+
+      // Get dimensions from viewBox (most reliable for Mermaid SVGs)
+      let width = 800;
+      let height = 600;
+      
+      const viewBox = svgElement.getAttribute('viewBox');
+      if (viewBox) {
+        const parts = viewBox.split(/[\s,]+/).map(Number);
+        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+          width = parts[2];
+          height = parts[3];
+        }
+      } else {
+        // Fallback to width/height attributes
+        const attrWidth = svgElement.getAttribute('width');
+        const attrHeight = svgElement.getAttribute('height');
+        if (attrWidth) width = parseFloat(attrWidth) || width;
+        if (attrHeight) height = parseFloat(attrHeight) || height;
+      }
+
+      // Scale up for better quality (2x)
+      const scale = 2;
+      const scaledWidth = Math.round(width * scale);
+      const scaledHeight = Math.round(height * scale);
+
+      // Set explicit dimensions on SVG to match canvas
+      svgElement.setAttribute('width', String(scaledWidth));
+      svgElement.setAttribute('height', String(scaledHeight));
+      
+      // Update viewBox to match the content dimensions
+      if (viewBox) {
+        // Keep original viewBox - it defines what part of the SVG to show
+      } else {
+        svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      }
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = scaledWidth;
+      canvas.height = scaledHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        toast.error('Failed to create canvas context');
+        return;
+      }
+
+      // Fill with white background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+
+      // Serialize SVG to string with proper encoding
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgElement);
+      
+      // Create a data URL
+      const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+      const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+      // Load SVG as image
+      const img = new Image();
+      
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+
+        // Convert to PNG and download
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            toast.error('Failed to create PNG');
+            return;
+          }
+          const pngUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = pngUrl;
+          a.download = `${selectedDiagram?.name || 'diagram'}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(pngUrl);
+          toast.success('PNG exported');
+        }, 'image/png');
+      };
+
+      img.onerror = (e) => {
+        console.error('Failed to load SVG:', e);
+        toast.error('Failed to load SVG for PNG export');
+      };
+
+      img.src = dataUrl;
+    } catch (error) {
+      console.error('PNG export error:', error);
+      toast.error('Failed to export PNG');
+    }
+  };
+
   const handleSaveSettings = async () => {
     try {
       if (apiKey.trim()) {
@@ -518,7 +634,11 @@ export function DiagramsPage() {
             )}
             <Button variant="outline" size="sm" onClick={handleExportSvg} disabled={!renderedSvg}>
               <Download className="h-4 w-4 mr-2" />
-              Export SVG
+              SVG
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPng} disabled={!renderedSvg}>
+              <Download className="h-4 w-4 mr-2" />
+              PNG
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowSettingsDialog(true)}>
               <Settings className="h-4 w-4" />
