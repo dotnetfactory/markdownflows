@@ -137,6 +137,16 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+## Author
+
+Created by [Emad Ibrahim](https://www.emadibrahim.com)
+
+## Sponsor
+
+This project is sponsored by **[EliteCoders](https://www.elitecoders.co)** - a complete remote talent solution providing on-demand, high-performance software development teams. EliteCoders connects you with top-tier engineers across 100+ skills, offering flexible engagement models from staff augmentation to dedicated teams and project-based delivery.
+
+[Learn more about EliteCoders →](https://www.elitecoders.co)
+
 ## License
 
 MIT License - see the [LICENSE](LICENSE) file for details.
