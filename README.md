@@ -1,6 +1,12 @@
-# MarkdownFlows
+<p align="center">
+  <img src="assets/icon-small.png" alt="MarkdownFlows Logo" width="128" />
+</p>
 
-AI-powered Mermaid diagram editor - Create and edit diagrams with natural language.
+<h1 align="center">MarkdownFlows</h1>
+
+<p align="center">
+  AI-powered Mermaid diagram editor - Create and edit diagrams with natural language.
+</p>
 
 ![MarkdownFlows Screenshot](docs/screenshot.png)
 
