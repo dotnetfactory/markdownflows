@@ -130,7 +130,7 @@ ${existingDiagram ? `\nCURRENT DIAGRAM TO MODIFY:\n\`\`\`\n${existingDiagram}\n\
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt },
         ],
-        ...this.buildCompletionParams(model, 4096, 0.7),
+        ...this.buildCompletionParams(model, 32000, 0.7),
       });
 
       let content = completion.choices[0]?.message?.content;

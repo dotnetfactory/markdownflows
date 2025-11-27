@@ -1,6 +1,6 @@
 import { app, safeStorage } from 'electron';
-import path from 'node:path';
 import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Simple settings service for storing application settings
