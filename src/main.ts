@@ -169,9 +169,9 @@ ipcMain.handle('diagrams:getById', async (_, id: string) => {
   }
 });
 
-ipcMain.handle('diagrams:create', async (_, name: string, content: string) => {
+ipcMain.handle('diagrams:create', async (_, name: string, content: string, prompt?: string) => {
   try {
-    const diagram = await diagramStorageService.create(name, content);
+    const diagram = await diagramStorageService.create(name, content, prompt);
     return { success: true, data: diagram };
   } catch (error) {
     return {
@@ -184,9 +184,9 @@ ipcMain.handle('diagrams:create', async (_, name: string, content: string) => {
   }
 });
 
-ipcMain.handle('diagrams:update', async (_, id: string, content: string) => {
+ipcMain.handle('diagrams:update', async (_, id: string, content: string, prompt?: string) => {
   try {
-    const diagram = await diagramStorageService.update(id, content);
+    const diagram = await diagramStorageService.update(id, content, prompt);
     return { success: true, data: diagram };
   } catch (error) {
     return {
@@ -256,6 +256,51 @@ ipcMain.handle('diagrams:revealInFinder', async () => {
       error: {
         message: error instanceof Error ? error.message : 'Failed to reveal in Finder',
         code: 'DIAGRAM_REVEAL_ERROR',
+      },
+    };
+  }
+});
+
+ipcMain.handle('diagrams:listVersions', async (_, diagramId: string) => {
+  try {
+    const versions = await diagramStorageService.listVersions(diagramId);
+    return { success: true, data: versions };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to list versions',
+        code: 'DIAGRAM_LIST_VERSIONS_ERROR',
+      },
+    };
+  }
+});
+
+ipcMain.handle('diagrams:getVersion', async (_, diagramId: string, versionId: string) => {
+  try {
+    const version = await diagramStorageService.getVersion(diagramId, versionId);
+    return { success: true, data: version };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to get version',
+        code: 'DIAGRAM_GET_VERSION_ERROR',
+      },
+    };
+  }
+});
+
+ipcMain.handle('diagrams:restoreVersion', async (_, diagramId: string, versionId: string) => {
+  try {
+    const diagram = await diagramStorageService.restoreVersion(diagramId, versionId);
+    return { success: true, data: diagram };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to restore version',
+        code: 'DIAGRAM_RESTORE_VERSION_ERROR',
       },
     };
   }

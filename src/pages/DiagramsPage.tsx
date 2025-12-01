@@ -29,12 +29,26 @@ import {
   Settings,
   Pencil,
   FolderOpen,
+  History,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
 } from 'lucide-react';
+
+interface DiagramVersion {
+  id: string;
+  diagramId: string;
+  content: string;
+  prompt?: string;
+  createdAt: number;
+}
 
 interface DiagramFile {
   id: string;
   name: string;
   content: string;
+  prompt?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -107,12 +121,17 @@ export function DiagramsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showVersionsDialog, setShowVersionsDialog] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [renameFileName, setRenameFileName] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
+  const [lastUsedPrompt, setLastUsedPrompt] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [openAIModel, setOpenAIModel] = useState('gpt-5');
+  const [versions, setVersions] = useState<DiagramVersion[]>([]);
+  const [selectedVersionIndex, setSelectedVersionIndex] = useState<number | null>(null);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
   // Panel widths (persisted to localStorage)
@@ -275,6 +294,25 @@ export function DiagramsPage() {
     }
   };
 
+  const loadVersions = async (diagramId: string) => {
+    setIsLoadingVersions(true);
+    try {
+      const response = await window.api.diagrams.listVersions(diagramId);
+      if (response.success) {
+        setVersions(response.data || []);
+        setSelectedVersionIndex(null);
+      } else {
+        toast.error('Failed to load versions', {
+          description: response.error?.message,
+        });
+      }
+    } catch {
+      toast.error('Failed to load versions');
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
   const handleSelectDiagram = (diagram: DiagramFile) => {
     if (hasUnsavedChanges) {
       const confirm = window.confirm('You have unsaved changes. Discard them?');
@@ -282,7 +320,10 @@ export function DiagramsPage() {
     }
     setSelectedDiagram(diagram);
     setEditorContent(diagram.content);
+    setLastUsedPrompt(diagram.prompt || '');
     setHasUnsavedChanges(false);
+    setVersions([]);
+    setSelectedVersionIndex(null);
   };
 
   const handleNewDiagram = () => {
@@ -292,7 +333,10 @@ export function DiagramsPage() {
     }
     setSelectedDiagram(null);
     setEditorContent(DEFAULT_DIAGRAM);
+    setLastUsedPrompt('');
     setHasUnsavedChanges(false);
+    setVersions([]);
+    setSelectedVersionIndex(null);
   };
 
   const handleSave = async () => {
@@ -300,7 +344,7 @@ export function DiagramsPage() {
       // Update existing diagram
       setIsSaving(true);
       try {
-        const response = await window.api.diagrams.update(selectedDiagram.id, editorContent);
+        const response = await window.api.diagrams.update(selectedDiagram.id, editorContent, lastUsedPrompt || undefined);
         if (response.success) {
           toast.success('Diagram saved');
           setSelectedDiagram(response.data!);
@@ -331,7 +375,7 @@ export function DiagramsPage() {
 
     setIsSaving(true);
     try {
-      const response = await window.api.diagrams.create(newFileName.trim(), editorContent);
+      const response = await window.api.diagrams.create(newFileName.trim(), editorContent, lastUsedPrompt || undefined);
       if (response.success) {
         toast.success('Diagram saved');
         setSelectedDiagram(response.data!);
@@ -403,6 +447,7 @@ export function DiagramsPage() {
       const response = await window.api.diagrams.generate(aiPrompt.trim(), editorContent);
       if (response.success && response.data) {
         setEditorContent(response.data);
+        setLastUsedPrompt(aiPrompt.trim());
         setAiPrompt('');
         toast.success('Diagram generated');
       } else if (!response.success) {
@@ -582,6 +627,64 @@ export function DiagramsPage() {
     }
   };
 
+  const handleOpenVersions = async () => {
+    if (!selectedDiagram) return;
+    await loadVersions(selectedDiagram.id);
+    setShowVersionsDialog(true);
+  };
+
+  const handleRestoreVersion = async (version: DiagramVersion) => {
+    if (!selectedDiagram) return;
+
+    try {
+      const response = await window.api.diagrams.restoreVersion(selectedDiagram.id, version.id);
+      if (response.success) {
+        toast.success('Version restored');
+        setSelectedDiagram(response.data!);
+        setEditorContent(response.data!.content);
+        setLastUsedPrompt(response.data!.prompt || '');
+        setHasUnsavedChanges(false);
+        setShowVersionsDialog(false);
+        loadDiagrams();
+      } else {
+        toast.error('Failed to restore version', {
+          description: response.error?.message,
+        });
+      }
+    } catch {
+      toast.error('Failed to restore version');
+    }
+  };
+
+  const handleUseVersionAsNew = (version: DiagramVersion) => {
+    if (hasUnsavedChanges) {
+      const confirm = window.confirm('You have unsaved changes. Discard them?');
+      if (!confirm) return;
+    }
+    setSelectedDiagram(null);
+    setEditorContent(version.content);
+    setLastUsedPrompt(version.prompt || '');
+    setHasUnsavedChanges(true);
+    setShowVersionsDialog(false);
+    setVersions([]);
+    setSelectedVersionIndex(null);
+    toast.success('Content loaded from version', {
+      description: 'Save as a new diagram to keep these changes',
+    });
+  };
+
+  const handlePreviewVersion = (index: number) => {
+    setSelectedVersionIndex(index);
+  };
+
+  const navigateVersion = (direction: 'prev' | 'next') => {
+    if (selectedVersionIndex === null) return;
+    const newIndex = direction === 'prev' 
+      ? Math.max(0, selectedVersionIndex - 1)
+      : Math.min(versions.length - 1, selectedVersionIndex + 1);
+    setSelectedVersionIndex(newIndex);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header - draggable region for window */}
@@ -615,6 +718,14 @@ export function DiagramsPage() {
             </Button>
             {selectedDiagram && (
               <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenVersions}
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  History
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -806,6 +917,13 @@ export function DiagramsPage() {
 
           {/* AI Prompt Area */}
           <div className="border-t bg-card p-4">
+            {lastUsedPrompt && (
+              <div className="mb-3 p-2 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Last prompt:</strong> {lastUsedPrompt}
+                </p>
+              </div>
+            )}
             <div className="flex gap-3">
               <div className="flex-1">
                 <Textarea
@@ -971,6 +1089,136 @@ Examples:
               Test Connection
             </Button>
             <Button onClick={handleSaveSettings}>Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Versions History Dialog */}
+      <Dialog open={showVersionsDialog} onOpenChange={setShowVersionsDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Version History</DialogTitle>
+            <DialogDescription>
+              Browse and restore previous versions of &quot;{selectedDiagram?.name}&quot;
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isLoadingVersions ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : versions.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              No version history available
+            </div>
+          ) : (
+            <div className="flex-1 flex gap-4 overflow-hidden min-h-[400px]">
+              {/* Version List */}
+              <div className="w-64 flex-shrink-0 border-r pr-4">
+                <ScrollArea className="h-full">
+                  <div className="space-y-2">
+                    {versions.map((version, index) => (
+                      <button
+                        key={version.id}
+                        onClick={() => handlePreviewVersion(index)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                          selectedVersionIndex === index
+                            ? 'bg-secondary text-secondary-foreground'
+                            : 'hover:bg-secondary/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(version.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        {index === 0 && (
+                          <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                            Latest
+                          </span>
+                        )}
+                        {version.prompt && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate" title={version.prompt}>
+                            Prompt: {version.prompt}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* Version Preview */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {selectedVersionIndex !== null ? (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigateVersion('prev')}
+                          disabled={selectedVersionIndex === 0}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          Version {versions.length - selectedVersionIndex} of {versions.length}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigateVersion('next')}
+                          disabled={selectedVersionIndex === versions.length - 1}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUseVersionAsNew(versions[selectedVersionIndex])}
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Use as New
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleRestoreVersion(versions[selectedVersionIndex])}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Restore
+                        </Button>
+                      </div>
+                    </div>
+
+                    {versions[selectedVersionIndex].prompt && (
+                      <div className="mb-2 p-2 bg-muted rounded text-xs">
+                        <strong>Prompt used:</strong> {versions[selectedVersionIndex].prompt}
+                      </div>
+                    )}
+
+                    <div className="flex-1 overflow-auto border rounded bg-muted/30">
+                      <pre className="p-4 text-xs font-mono whitespace-pre-wrap">
+                        {versions[selectedVersionIndex].content}
+                      </pre>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                    Select a version to preview
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVersionsDialog(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
